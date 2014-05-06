@@ -1,0 +1,7 @@
+NewsCrawler is a simple tool that a specific website, checks if it for new items (or articles) and generates an output for those items. The generated output is essentially a compact list of interesting items to check in the future.
+
+At the moment 2 types out outputs are supported: HTML and RSS.
+
+The tool is plugin driven which means that if you want to support a specific site, you can (with some Python knowledge) implement support for it without need to change the main tool.
+
+This tool depends on BeautifulSoup, html5lib and PyRSSGen

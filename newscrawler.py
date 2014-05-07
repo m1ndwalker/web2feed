@@ -1,15 +1,14 @@
+__author__ = 'Joel Alvim'
+
 from newsrecord import NewsRecord
 from writers.htmlwriter import HtmlWriter
 from writers.rsswriter import RssWriter
-
-__author__ = 'Joel Alvim'
 
 import time
 import sys
 import getopt
 import sqlite3
 import os.path
-import datetime
 import urllib
 
 from bs4 import BeautifulSoup
@@ -49,9 +48,10 @@ class NewsCrawler:
         cur.execute("select last_id from crawler_state where crawler=?", (self._crawler.plugin_name,))
         last_id_row = cur.fetchone()
         if last_id_row is None:
-            print("Could not retrieve Last Row Id")
+            print("Last Stored News ID for Crawler %s doesn't exist" % self._crawler.plugin_name)
         else:
             last_id = last_id_row[0]
+            print("Last Stored News ID for Crawler %s is %s" % (self._crawler.plugin_name, last_id))
 
 
         while last_id_found is not True and current_fetch_page <= self._max_fetch_pages:
@@ -61,15 +61,17 @@ class NewsCrawler:
 
             soup = BeautifulSoup(f,"html5lib")
 
+            print("Requesting crawler to process page %i" % current_fetch_page)
+
             last_id_found = self._crawler.process_page(soup, last_id)
 
             f.close()
 
             if last_id_found:
-                print("Last Id Found: " + last_id)
+                print("Last Stored News ID Found: " + last_id)
                 break
 
-            print("Fetched page %s" % current_fetch_page)
+            print("Processed page %s" % current_fetch_page)
 
             # Wait 10 seconds before requesting the next page. We don't want to overload the server and get banned
             if current_fetch_page < self._max_fetch_pages:
@@ -97,6 +99,7 @@ class NewsCrawler:
                              self._crawler.plugin_name))
 
             print("Saving Last Found ID: %s" % records[len(records) - 1].id)
+
             cur.execute("INSERT OR REPLACE into crawler_state(last_id, crawler) values (?,?)",
                         (records[len(records) - 1].id,self._crawler.plugin_name))
 
@@ -133,8 +136,8 @@ class NewsCrawler:
         conn.commit()
         conn.close()
 
-#Max Fetch pages Default value is 1
-max_fetch_pages = 1
+#Max Fetch pages Default value is 5
+max_fetch_pages = 5
 #Writer Default is html
 writer = "htmlwriter"
 #Default path is the current directory

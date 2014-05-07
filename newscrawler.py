@@ -57,8 +57,8 @@ class NewsCrawler:
 
         while last_id_found is not True and current_fetch_page <= self._max_fetch_pages:
 
-            #f = urllib.request.urlopen(self._crawler.get_url_for_page(current_fetch_page))
-            f = open("gitaarmarkt.htm", mode="r", encoding="utf-8")
+            f = urllib.request.urlopen(self._crawler.get_url_for_page(current_fetch_page))
+            #f = open("gitaarmarkt.htm", mode="r", encoding="utf-8")
 
 
             soup = BeautifulSoup(f,"html5lib")

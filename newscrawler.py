@@ -9,6 +9,7 @@ import sys
 import getopt
 import sqlite3
 import os.path
+import datetime
 import urllib
 
 from bs4 import BeautifulSoup
@@ -29,7 +30,7 @@ class NewsCrawler:
         cur.execute("select name from sqlite_master where type='table' and name='records'")
         if len(cur.fetchall()) < 1:
             cur.execute("CREATE TABLE records "
-                        "(id text, link text, title text, description text, date text,"
+                        "(id text, link text, title text, description text, date real,"
                         " creation_date real, crawler text)")
             cur.execute("CREATE TABLE crawler_state(last_id text, crawler text unique)")
 
@@ -56,8 +57,9 @@ class NewsCrawler:
 
         while last_id_found is not True and current_fetch_page <= self._max_fetch_pages:
 
-            f = urllib.request.urlopen(self._crawler.get_url_for_page(current_fetch_page))
-            #f = open("gitaarmarkt.htm", mode="r", encoding="utf-8")
+            #f = urllib.request.urlopen(self._crawler.get_url_for_page(current_fetch_page))
+            f = open("gitaarmarkt.htm", mode="r", encoding="utf-8")
+
 
             soup = BeautifulSoup(f,"html5lib")
 
@@ -94,7 +96,7 @@ class NewsCrawler:
                              rec.link,
                              rec.title,
                              rec.description,
-                             rec.date,
+                             time.mktime(rec.date.timetuple()),
                              time.time(),
                              self._crawler.plugin_name))
 
@@ -115,17 +117,20 @@ class NewsCrawler:
             # Get the last 200 records
             rss_records = []
             for row in cur.execute(
-                    "SELECT id, link, title, description, date, datetime(creation_date, 'unixepoch', 'localtime'), crawler "
+                    "SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
+                    "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
                     "from records where crawler=? order by creation_date desc, id asc limit 200",
                     (self._crawler.plugin_name,)):
+
+                print(row)
 
                 record = NewsRecord()
                 record.id = row[0]
                 record.link = row[1]
                 record.title = row[2]
                 record.description= row[3]
-                record.date = row[4]
-                record.creation_date = row[5]
+                record.date = datetime.datetime.strptime(row[4], "%Y-%m-%d %H:%M:%S")
+                record.creation_date = datetime.datetime.strptime(row[5], "%Y-%m-%d %H:%M:%S")
                 record.crawler_name = row[6]
 
                 rss_records.append(record)

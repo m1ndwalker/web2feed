@@ -89,8 +89,8 @@ class Crawler:
 
                                         record.date = publish_date
                                     else:
-                                        print("Could not parse date from %s" % all_text)
-                                        record.date = all_text
+                                        print("Could not parse date from %s, so just assume now()" % all_text)
+                                        record.date = datetime.utcnow()
 
                                 # Column Containing the Type
                                 elif column_count == 4:

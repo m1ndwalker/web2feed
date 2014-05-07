@@ -28,7 +28,7 @@ class RssWriter:
                     link= record.link,
                     description= record.title + " - " + record.description,
                     guid= record.id,
-                    pubDate= record.date
+                    pubDate= utils.formatdate(time.mktime(record.date.timetuple()))
                 )
 
                 rss_records.append(rss_item)

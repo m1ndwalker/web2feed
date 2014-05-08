@@ -122,7 +122,8 @@ class NewsCrawler:
                     "from records where crawler=? order by creation_date desc, id asc limit 200",
                     (self._crawler.plugin_name,)):
 
-                print(row)
+                #print(row)
+
 
                 record = NewsRecord()
                 record.id = row[0]

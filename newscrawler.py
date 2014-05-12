@@ -69,6 +69,38 @@ class NewsCrawler:
 
             f.close()
 
+            # Retrieve the current records and save them to our database, then clean the array
+            # We want to be memory efficient
+
+            records = self._crawler.news_records
+
+            if len(records) == 0:
+                print("No new search results found... ")
+            else:
+                print("Found %s new records" % len(records))
+
+                for rec in records:
+                    print("Inserting new record with ID: %s" % rec.id)
+                    cur.execute("INSERT INTO records VALUES (?,?,?,?,?,?,?)",
+                                (rec.id,
+                                 rec.link,
+                                 rec.title,
+                                 rec.description,
+                                 time.mktime(rec.date.timetuple()),
+                                 time.time(),
+                                 self._crawler.plugin_name))
+
+                # We iterate the pages from most recent to oldest, therefore our last found ID will be the
+                # First item found, on the 1st page.
+                if current_fetch_page == 1:
+                    print("Saving Last Found ID: %s" % records[len(records) - 1].id)
+
+                    cur.execute("INSERT OR REPLACE into crawler_state(last_id, crawler) values (?,?)",
+                                (records[len(records) - 1].id,self._crawler.plugin_name))
+
+                # Clear the crawler list
+                del self._crawler.news_records[:]
+
             if last_id_found:
                 print("Last Stored News ID Found: " + last_id)
                 break
@@ -82,35 +114,39 @@ class NewsCrawler:
 
             current_fetch_page += 1
 
-        records = self._crawler.news_records
-
-        if len(records) == 0:
-            print("No new search results found... ")
-        else:
-            print("Found %s new records" % len(records))
-
-            for rec in records:
-                print("Inserting new record with ID: %s" % rec.id)
-                cur.execute("INSERT INTO records VALUES (?,?,?,?,?,?,?)",
-                            (rec.id,
-                             rec.link,
-                             rec.title,
-                             rec.description,
-                             time.mktime(rec.date.timetuple()),
-                             time.time(),
-                             self._crawler.plugin_name))
-
-            print("Saving Last Found ID: %s" % records[len(records) - 1].id)
-
-            cur.execute("INSERT OR REPLACE into crawler_state(last_id, crawler) values (?,?)",
-                        (records[len(records) - 1].id,self._crawler.plugin_name))
-
 
         if writer == "htmlwriter":
             results_file_name = os.path.normpath(out_path + "/" + self._crawler.plugin_name + "_results_" + execution_time_str +  ".htm")
 
-            html_writer = HtmlWriter(records, results_file_name)
+            if not last_id is None:
+                cur.execute("select rowid from records where id=?", (last_id,))
+
+                last_id_rowid = cur.fetchone()[0]
+                cur.execute("SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
+                            "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
+                            "from records where rowid > ?", (last_id_rowid,))
+            else:
+                cur.execute("SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
+                            "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
+                            "from records")
+
+            new_records = []
+            for row in cur:
+
+                record = NewsRecord()
+                record.id = row[0]
+                record.link = row[1]
+                record.title = row[2]
+                record.description= row[3]
+                record.date = datetime.datetime.strptime(row[4], "%Y-%m-%d %H:%M:%S")
+                record.creation_date = datetime.datetime.strptime(row[5], "%Y-%m-%d %H:%M:%S")
+                record.crawler_name = row[6]
+
+                new_records.append(record)
+
+            html_writer = HtmlWriter(new_records, results_file_name)
             html_writer.write()
+
         elif writer == "rsswriter":
             results_file_name = os.path.normpath(out_path + "/" + self._crawler.plugin_name + ".xml")
 

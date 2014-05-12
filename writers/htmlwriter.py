@@ -32,10 +32,9 @@ class HtmlWriter:
             write_f_dump.writelines(
             [' ID: ' + rec.id + '<br>\n',
              ' Title: ' + rec.title + '<br>\n',
-             ' Type: ' + rec.type + '<br>\n',
-             ' Date: ' + rec.date + '<br>\n',
-             ' Price: ' + rec.price + '<br>\n',
-             ' Category: ' + rec.category + '<br>\n',
+             ' Published Date: ' + rec.date.strftime("%Y-%m-%d %H:%M:%S") + '<br>\n',
+             ' Creation Date: ' + rec.creation_date.strftime("%Y-%m-%d %H:%M:%S") + '<br>\n',
+             ' Description: ' + rec.description + '<br>\n',
              ' Link: <a href="' + rec.link + '">' + rec.link + '</a><br>\n',
              ' <p>\n'])
 

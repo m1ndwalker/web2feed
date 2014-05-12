@@ -84,13 +84,14 @@ class Crawler:
                                         day = int(match.group(1))
                                         month = int(match.group(2))
 
-                                        now_date = datetime.today()
-                                        publish_date = datetime(year= now_date.year, month= month, day= day)
+                                        curr_time = datetime.today()
+
+                                        publish_date = datetime(year= curr_time.year, month= month, day= day)
 
                                         record.date = publish_date
                                     else:
-                                        print("Could not parse date from %s, so just assume now()" % all_text)
-                                        record.date = datetime.utcnow()
+                                        print("Could not parse date from %s, so just assume today()" % all_text)
+                                        record.date = datetime.today()
 
                                 # Column Containing the Type
                                 elif column_count == 4:

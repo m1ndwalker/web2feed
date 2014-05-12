@@ -28,7 +28,7 @@ class RssWriter:
                     link= record.link,
                     description= record.title + " - " + record.description,
                     guid= record.id,
-                    pubDate= utils.formatdate(time.mktime(record.date.timetuple()))
+                    pubDate= utils.formatdate(time.mktime(record.date.timetuple()), True)
                 )
 
                 rss_records.append(rss_item)
@@ -38,7 +38,7 @@ class RssWriter:
                 link= self._source_url,
                 description="RSS Dump from selected sources",
 
-                lastBuildDate= utils.formatdate(time.mktime(datetime.datetime.now().timetuple())),
+                lastBuildDate= utils.formatdate(time.mktime(datetime.datetime.now().timetuple()), True),
                 items=rss_records
             )
 

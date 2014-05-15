@@ -112,3 +112,20 @@ class Crawler:
 
         return False
 
+
+    def fetch_body_for(self, p_record, p_record_soup):
+
+        # We have to find a <b> attribute that includes the text below
+        b_tag = p_record_soup.find("b",text = re.compile('.*Advertentie geplaatst door.*'))
+
+        # Now we need to first the second parent table of the tag, and this is our body
+        parent_tables = b_tag.find_parents(name= "table", limit= 1)
+
+        if len(parent_tables) != 1:
+            print("An error occurred fetching the body for record %s. Can't find second parent table to <b> with the title." % p_record.title)
+            return None
+
+        content_soup = parent_tables[0]
+
+        return str(content_soup)
+

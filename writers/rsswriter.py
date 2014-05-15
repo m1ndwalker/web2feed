@@ -5,6 +5,8 @@ import datetime
 import time
 from email import utils
 
+from xml.sax import saxutils
+
 
 class RssWriter:
 
@@ -23,10 +25,10 @@ class RssWriter:
         if len(self._records) > 0:
             for record in self._records:
                 rss_item = PyRSS2Gen.RSSItem(
-                    author= __author__,
+                    author= "1llum1nat1",
                     title= record.title,
                     link= record.link,
-                    description= record.title + " - " + record.description,
+                    description= record.description,
                     guid= record.id,
                     pubDate= utils.formatdate(time.mktime(record.date.timetuple()), True)
                 )
@@ -42,9 +44,20 @@ class RssWriter:
                 items=rss_records
             )
 
+            # Write to a string first, since PyRSS2Gen uses internally the escape method of saxutils.py
+
+            #rss_text = rss.to_xml(encoding="utf-8")
+
+            # Now use Beautiful Soup to fix the character escapes inside CDATA structures
+
+            #rss_text = saxutils.unescape(rss_text)
+
             print("Attempting to Save Records into file: %s" % self._filename)
 
             write_f = open(self._filename, encoding="utf-8", mode="w")
             rss.write_xml(write_f, "utf-8")
+
+            #write_f.write(rss_text)
+
 
 

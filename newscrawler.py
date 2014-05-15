@@ -11,6 +11,7 @@ import sqlite3
 import os.path
 import datetime
 import urllib
+import random
 
 from bs4 import BeautifulSoup
 
@@ -55,11 +56,15 @@ class NewsCrawler:
             print("Last Stored News ID for Crawler %s is %s" % (self._crawler.plugin_name, last_id))
 
 
+        # Initialize the Random Seed, to be used throughout
+        random.random()
+
         while last_id_found is not True and current_fetch_page <= self._max_fetch_pages:
 
-            f = urllib.request.urlopen(self._crawler.get_url_for_page(current_fetch_page))
+            req = urllib.request.Request(self._crawler.get_url_for_page(current_fetch_page),
+                                         headers={"User-Agent" : REQUEST_USER_AGENT_STRING})
+            f = urllib.request.urlopen(req)
             #f = open("gitaarmarkt.htm", mode="r", encoding="utf-8")
-
 
             soup = BeautifulSoup(f,"html5lib")
 
@@ -78,6 +83,26 @@ class NewsCrawler:
                 print("No new search results found... ")
             else:
                 print("Found %s new records" % len(records))
+
+                # Proceed to fetch the body of each record
+                for rec in records:
+
+                    # To avoid hitting the server always at the same interval, generate a random sleep time in secs
+                    sleep_time = random.randint(1,10)
+                    print("In %i seconds, Fetching body for %s" % (sleep_time, rec.link))
+
+                    time.sleep(sleep_time)
+
+                    record_req = urllib.request.Request(rec.link,
+                                                        headers={"User-Agent" : REQUEST_USER_AGENT_STRING})
+                    record_f = urllib.request.urlopen(record_req)
+
+                    record_soup = BeautifulSoup(record_f,"html5lib")
+                    body_text = self._crawler.fetch_body_for(rec, record_soup)
+
+                    if not body_text is None and not body_text == "":
+                        rec.description = body_text
+
 
                 for rec in records:
                     print("Inserting new record with ID: %s" % rec.id)
@@ -107,10 +132,12 @@ class NewsCrawler:
 
             print("Processed page %s" % current_fetch_page)
 
-            # Wait 10 seconds before requesting the next page. We don't want to overload the server and get banned
+            sleep_time = random.randint(10,20)
+            # Wait 10-20 seconds before requesting the next page. We don't want to overload the server and get banned
+            # Don't always use the same period to appear more human
             if current_fetch_page < self._max_fetch_pages:
-                print("Waiting 10 seconds for next page...")
-                time.sleep(10)
+                print("Waiting %i seconds for next page..." % sleep_time)
+                time.sleep(sleep_time)
 
             current_fetch_page += 1
 
@@ -185,6 +212,9 @@ writer = "htmlwriter"
 #Default path is the current directory
 out_path = os.path.normpath("./")
 
+REQUEST_USER_AGENT_STRING = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/537.13+ " \
+                            "(KHTML, like Gecko) Version/5.1.7 Safari/534.57.2"
+
 # Check Shell Params
 try:
     if len(sys.argv) <= 1:
@@ -192,7 +222,8 @@ try:
 
     opts, args = getopt.getopt(sys.argv[1:], "", ["crawler=", "max-fetch-p=", "writer=", "out-path="])
 except getopt.GetoptError:
-    print("Usage: newscrawler.py --crawler=crawler_to_use --max-fetch-p=max_number_pages_to_fetch --writer=writer_to_use")
+    print("Usage: newscrawler.py --crawler=crawler_to_use --max-fetch-p=max_number_pages_to_fetch "
+          "--writer=writer_to_use --out-path=output_path_for_writer")
     sys.exit(2)
 for opt, arg in opts:
     if opt == "--crawler":

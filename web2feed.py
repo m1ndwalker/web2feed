@@ -3,6 +3,7 @@ __author__ = 'Joel Alvim'
 from newsrecord import NewsRecord
 from writers.htmlwriter import HtmlWriter
 from writers.rsswriter import RssWriter
+from resources import resourcemanager
 
 import time
 import sys
@@ -23,9 +24,13 @@ class Web2Feed:
         self._max_fetch_pages = max_fetch_pages
 
 
+    # Check if our table exists and if not, create it
     def prep_database(self):
-        # Check if our table exists and if not, create it
-        conn = sqlite3.connect('web2feed.db')
+
+        # Check the path for our database
+        db_path = resourcemanager.get_database_path()
+
+        conn = sqlite3.connect(db_path)
         cur = conn.cursor()
 
         cur.execute("select name from sqlite_master where type='table' and name='records'")

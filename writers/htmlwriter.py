@@ -1,7 +1,10 @@
 __author__ = 'Joel Alvim'
 
+import logging
 
 class HtmlWriter:
+
+    _logger = logging.getLogger("writers.htmlwriter")
 
     _records = []
     _filename = ""
@@ -13,10 +16,10 @@ class HtmlWriter:
     def write(self):
 
         if not len(self._records) > 0:
-            print("No new Records to write with HtmlWriter")
+            self._logger.info("No new Records to write with HtmlWriter")
             return
 
-        print("Attempting to Save Records into file: %s" % self._filename)
+        self._logger.info("Attempting to Save Records into file: %s" % self._filename)
 
         write_f_dump = open(self._filename, encoding="utf-8", mode="w")
 

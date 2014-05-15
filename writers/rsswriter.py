@@ -3,12 +3,15 @@ __author__ = 'Joel Alvim'
 import PyRSS2Gen
 import datetime
 import time
+import logging
 from email import utils
 
 from xml.sax import saxutils
 
 
 class RssWriter:
+
+    _logger = logging.getLogger("writers.rsswriter")
 
     _records = []
     _filename = ""
@@ -52,7 +55,7 @@ class RssWriter:
 
             #rss_text = saxutils.unescape(rss_text)
 
-            print("Attempting to Save Records into file: %s" % self._filename)
+            self._logger.info("Attempting to Save Records into file: %s" % self._filename)
 
             write_f = open(self._filename, encoding="utf-8", mode="w")
             rss.write_xml(write_f, "utf-8")

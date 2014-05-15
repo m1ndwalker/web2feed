@@ -13,11 +13,17 @@ import os.path
 import datetime
 import urllib
 import random
+import logging
 
 from bs4 import BeautifulSoup
 
 
 class Web2Feed:
+
+    # Set default Logging level to INFO
+    logging.basicConfig(level=logging.INFO)
+    # Get logger for this class
+    _logger = logging.getLogger("web2feed")
 
     def __init__(self, crawler, max_fetch_pages):
         self._crawler = crawler
@@ -55,10 +61,10 @@ class Web2Feed:
         cur.execute("select last_id from crawler_state where crawler=?", (self._crawler.plugin_name,))
         last_id_row = cur.fetchone()
         if last_id_row is None:
-            print("Last Stored News ID for Crawler %s doesn't exist" % self._crawler.plugin_name)
+            self._logger.info("Last Stored News ID for Crawler %s doesn't exist" % self._crawler.plugin_name)
         else:
             last_id = last_id_row[0]
-            print("Last Stored News ID for Crawler %s is %s" % (self._crawler.plugin_name, last_id))
+            self._logger.info("Last Stored News ID for Crawler %s is %s" % (self._crawler.plugin_name, last_id))
 
 
         # Initialize the Random Seed, to be used throughout
@@ -73,7 +79,7 @@ class Web2Feed:
 
             soup = BeautifulSoup(f,"html5lib")
 
-            print("Requesting crawler to process page %i" % current_fetch_page)
+            self._logger.info("Requesting crawler to process page %i" % current_fetch_page)
 
             last_id_found = self._crawler.process_page(soup, last_id)
 
@@ -85,16 +91,16 @@ class Web2Feed:
             records = self._crawler.news_records
 
             if len(records) == 0:
-                print("No new search results found... ")
+                self._logger.info("No new search results found... ")
             else:
-                print("Found %s new records" % len(records))
+                self._logger.info("Found %s new records" % len(records))
 
                 # Proceed to fetch the body of each record
                 for rec in records:
 
                     # To avoid hitting the server always at the same interval, generate a random sleep time in secs
                     sleep_time = random.randint(1,10)
-                    print("In %i seconds, Fetching body for %s" % (sleep_time, rec.link))
+                    self._logger.info("In %i seconds, Fetching body for %s" % (sleep_time, rec.link))
 
                     time.sleep(sleep_time)
 
@@ -110,7 +116,7 @@ class Web2Feed:
 
 
                 for rec in records:
-                    print("Inserting new record with ID: %s" % rec.id)
+                    self._logger.info("Inserting new record with ID: %s" % rec.id)
                     cur.execute("INSERT INTO records VALUES (?,?,?,?,?,?,?)",
                                 (rec.id,
                                  rec.link,
@@ -123,7 +129,7 @@ class Web2Feed:
                 # We iterate the pages from most recent to oldest, therefore our last found ID will be the
                 # First item found, on the 1st page.
                 if current_fetch_page == 1:
-                    print("Saving Last Found ID: %s" % records[len(records) - 1].id)
+                    self._logger.info("Saving Last Found ID: %s" % records[len(records) - 1].id)
 
                     cur.execute("INSERT OR REPLACE into crawler_state(last_id, crawler) values (?,?)",
                                 (records[len(records) - 1].id,self._crawler.plugin_name))
@@ -132,16 +138,16 @@ class Web2Feed:
                 del self._crawler.news_records[:]
 
             if last_id_found:
-                print("Last Stored News ID Found: " + last_id)
+                self._logger.info("Last Stored News ID Found: " + last_id)
                 break
 
-            print("Processed page %s" % current_fetch_page)
+            self._logger.info("Processed page %s" % current_fetch_page)
 
             sleep_time = random.randint(10,20)
             # Wait 10-20 seconds before requesting the next page. We don't want to overload the server and get banned
             # Don't always use the same period to appear more human
             if current_fetch_page < self._max_fetch_pages:
-                print("Waiting %i seconds for next page..." % sleep_time)
+                self._logger.info("Waiting %i seconds for next page..." % sleep_time)
                 time.sleep(sleep_time)
 
             current_fetch_page += 1
@@ -263,10 +269,10 @@ for opt, arg in opts:
             print("Specified output path %s doesn't exist" % arg)
             exit(1)
 
-print("Configured crawler: %s" % crawler.plugin_name )
-print("Max Pages to Fetch: %s" % max_fetch_pages )
-print("Writer to use: %s" % writer )
-print("Output Path: %s" % out_path )
+Web2Feed._logger.info("Configured crawler: %s" % crawler.plugin_name)
+Web2Feed._logger.info("Max Pages to Fetch: %s" % max_fetch_pages)
+Web2Feed._logger.info("Writer to use: %s" % writer )
+Web2Feed._logger.info("Output Path: %s" % out_path )
 
 news_crawler = Web2Feed(crawler, int(max_fetch_pages))
 news_crawler.crawl()

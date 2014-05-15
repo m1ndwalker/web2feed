@@ -3,11 +3,15 @@ __author__ = 'Joel Alvim'
 import re
 import newsrecord
 import urllib
+import logging
 
 from datetime import datetime
 
 
 class Crawler:
+
+    _logger = logging.getLogger("crawlers.gitaarmarkt")
+
     base_url = "http://www.gitaarmarkt.nl/"
     search_page_url = "http://www.gitaarmarkt.nl/index.php"
     plugin_name = "gitaarmarkt"
@@ -90,7 +94,7 @@ class Crawler:
 
                                         record.date = publish_date
                                     else:
-                                        print("Could not parse date from %s, so just assume today()" % all_text)
+                                        self._logger.warning("Could not parse date from %s, so just assume today()" % all_text)
                                         record.date = datetime.today()
 
                                 # Column Containing the Type
@@ -122,7 +126,7 @@ class Crawler:
         parent_tables = b_tag.find_parents(name= "table", limit= 1)
 
         if len(parent_tables) != 1:
-            print("An error occurred fetching the body for record %s. Can't find second parent table to <b> with the title." % p_record.title)
+            self._logger.error("An error occurred fetching the body for record %s. Can't find second parent table to <b> with the title." % p_record.title)
             return None
 
         content_soup = parent_tables[0]

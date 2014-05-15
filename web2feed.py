@@ -146,6 +146,9 @@ class Web2Feed:
 
             current_fetch_page += 1
 
+        # Commit results immediately after having fetched them all (there can be an error thrown
+        # in the output generation part and then nothing is saved to the database)
+        conn.commit()
 
         if writer == "htmlwriter":
             results_file_name = os.path.normpath(out_path + "/" + self._crawler.plugin_name + "_results_" + execution_time_str +  ".htm")
@@ -207,7 +210,6 @@ class Web2Feed:
             rss_writer = RssWriter(rss_records, self._crawler.base_url, results_file_name)
             rss_writer.write()
 
-        conn.commit()
         conn.close()
 
 #Max Fetch pages Default value is 5

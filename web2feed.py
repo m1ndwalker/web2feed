@@ -16,7 +16,7 @@ import random
 from bs4 import BeautifulSoup
 
 
-class NewsCrawler:
+class Web2Feed:
 
     def __init__(self, crawler, max_fetch_pages):
         self._crawler = crawler
@@ -25,7 +25,7 @@ class NewsCrawler:
 
     def prep_database(self):
         # Check if our table exists and if not, create it
-        conn = sqlite3.connect('newscrawler.db')
+        conn = sqlite3.connect('web2feed.db')
         cur = conn.cursor()
 
         cur.execute("select name from sqlite_master where type='table' and name='records'")
@@ -222,7 +222,7 @@ try:
 
     opts, args = getopt.getopt(sys.argv[1:], "", ["crawler=", "max-fetch-p=", "writer=", "out-path="])
 except getopt.GetoptError:
-    print("Usage: newscrawler.py --crawler=crawler_to_use --max-fetch-p=max_number_pages_to_fetch "
+    print("Usage: web2feed.py --crawler=crawler_to_use --max-fetch-p=max_number_pages_to_fetch "
           "--writer=writer_to_use --out-path=output_path_for_writer")
     sys.exit(2)
 for opt, arg in opts:
@@ -261,5 +261,5 @@ print("Max Pages to Fetch: %s" % max_fetch_pages )
 print("Writer to use: %s" % writer )
 print("Output Path: %s" % out_path )
 
-news_crawler = NewsCrawler(crawler, int(max_fetch_pages))
+news_crawler = Web2Feed(crawler, int(max_fetch_pages))
 news_crawler.crawl()

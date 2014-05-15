@@ -1,4 +1,4 @@
-NewsCrawler is a simple tool that a specific website, checks if it for new items (or articles) and generates an output for those items. The generated output is essentially a compact list of interesting items to check in the future.
+Web2Feed is a simple tool that takes a specific website, checks if it for new items (or articles) and generates an output for those items. The generated output is essentially a compact list of interesting items to check in the future.
 
 At the moment 2 types out outputs are supported: HTML and RSS.
 

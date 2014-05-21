@@ -14,16 +14,12 @@ import datetime
 import urllib
 import random
 import logging
+import logging.config
 
 from bs4 import BeautifulSoup
 
 
 class Web2Feed:
-
-    # Set default Logging level to INFO
-    logging.basicConfig(level=logging.INFO)
-    # Get logger for this class
-    _logger = logging.getLogger("web2feed")
 
     def __init__(self, crawler, max_fetch_pages):
         self._crawler = crawler
@@ -269,10 +265,26 @@ for opt, arg in opts:
             print("Specified output path %s doesn't exist" % arg)
             exit(1)
 
-Web2Feed._logger.info("Configured crawler: %s" % crawler.plugin_name)
-Web2Feed._logger.info("Max Pages to Fetch: %s" % max_fetch_pages)
-Web2Feed._logger.info("Writer to use: %s" % writer )
-Web2Feed._logger.info("Output Path: %s" % out_path )
+# Set default Logging level to INFO
+logging.basicConfig(level=logging.INFO)
+
+# Check if we have a logging configuration file in the current working directory and if so, use it
+curr_dir = os.path.realpath('./')
+logging_conf_f = os.path.join(curr_dir, "logging.conf")
+if os.path.isfile(logging_conf_f):
+    print("Logging configuration file found in %s" % logging_conf_f)
+    logging.config.fileConfig(logging_conf_f)
+else:
+    print("No logging.conf file has been found in %s" % curr_dir)
+
+# Get the logger for this class
+logger = logging.getLogger("web2feed")
+
+logger.info("Configured crawler: %s" % crawler.plugin_name)
+logger.info("Max Pages to Fetch: %s" % max_fetch_pages)
+logger.info("Writer to use: %s" % writer )
+logger.info("Output Path: %s" % out_path )
 
 news_crawler = Web2Feed(crawler, int(max_fetch_pages))
+news_crawler._logger =  logger
 news_crawler.crawl()

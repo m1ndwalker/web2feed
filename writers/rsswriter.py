@@ -4,6 +4,7 @@ import PyRSS2Gen
 import datetime
 import time
 import logging
+import re
 from email import utils
 
 from xml.sax import saxutils
@@ -17,6 +18,8 @@ class RssWriter:
     _filename = ""
     _source_url = ""
 
+
+
     def __init__(self, records, source_url, filename):
         self._records = records
         self._filename = filename
@@ -29,11 +32,11 @@ class RssWriter:
             for record in self._records:
                 rss_item = PyRSS2Gen.RSSItem(
                     author= "1llum1nat1",
-                    title= record.title,
-                    link= record.link,
-                    description= record.description,
-                    guid= record.id,
-                    pubDate= utils.formatdate(time.mktime(record.date.timetuple()), True)
+                    title= self.unicode_to_valid_xml(record.title),
+                    link= self.unicode_to_valid_xml(record.link),
+                    description= self.unicode_to_valid_xml(record.description),
+                    guid= self.unicode_to_valid_xml(record.id),
+                    pubDate= self.unicode_to_valid_xml(utils.formatdate(time.mktime(record.date.timetuple()), True))
                 )
 
                 rss_records.append(rss_item)
@@ -63,4 +66,11 @@ class RssWriter:
             #write_f.write(rss_text)
 
 
+    def unicode_to_valid_xml(self, p_string):
+        # When you put utf-8 encoded strings in a XML document you should remember that not all utf-8 valid chars
+        # are accepted in a XML document http://www.w3.org/TR/REC-xml/#charsets
 
+        pattern = re.compile("[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD]+")
+        valid_xml_string = pattern.sub("",p_string)
+
+        return valid_xml_string

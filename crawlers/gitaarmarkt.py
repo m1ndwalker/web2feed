@@ -6,17 +6,16 @@ import urllib
 import logging
 
 from datetime import datetime
+from crawlers import crawlerbase
 
 
-class Crawler:
+class Crawler(crawlerbase.CrawlerBase):
 
     _logger = logging.getLogger("crawlers.gitaarmarkt")
 
     base_url = "http://www.gitaarmarkt.nl/"
     search_page_url = "http://www.gitaarmarkt.nl/index.php"
     plugin_name = "gitaarmarkt"
-
-    news_records = []
 
     def get_url_for_page(self, p_page):
 
@@ -130,6 +129,14 @@ class Crawler:
             return None
 
         content_soup = parent_tables[0]
+
+        # Further strip down the content to take up less space with things we don't need.
+        # Get rid of font tags
+        for font in content_soup.find_all('font'):
+            font.unwrap();
+        # Get rid of spacers
+        for font in content_soup.find_all('spacer'):
+            font.extract();
 
         return str(content_soup)
 

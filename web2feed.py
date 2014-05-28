@@ -110,10 +110,11 @@ class Web2Feed:
                         record_f = urllib.request.urlopen(record_req)
 
                         record_soup = BeautifulSoup(record_f,"html5lib")
-                        body_text = crawler.fetch_body_for(rec, record_soup)
 
-                        if not body_text is None and not body_text == "":
-                            rec.description = body_text
+                        if not crawler.reject_record(rec, record_soup):
+                            body_text = crawler.fetch_body_for(rec, record_soup)
+                            if not body_text is None and not body_text == "":
+                                rec.description = body_text
 
 
                     for rec in records:
@@ -160,20 +161,13 @@ class Web2Feed:
             if writer == "htmlwriter":
                 results_file_name = os.path.normpath(out_path + "/" + crawler.plugin_name + "_results_" + execution_time_str +  ".htm")
 
-                if not last_id is None:
-                    cur.execute("select rowid from records where id=?", (last_id,))
-
-                    last_id_rowid = cur.fetchone()[0]
-                    cur.execute("SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
-                                "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
-                                "from records where rowid > ?", (last_id_rowid,))
-                else:
-                    cur.execute("SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
-                                "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
-                                "from records")
-
                 new_records = []
-                for row in cur:
+                for row in cur.execute(
+                        "SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
+                        "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
+                        "from records where crawler=? and datetime(creation_date,'unixepoch') >= "
+                        "datetime('now',?) order by creation_date desc, id asc",
+                        (crawler.plugin_name, write_items_since)):
 
                     record = NewsRecord()
                     record.id = row[0]
@@ -186,19 +180,27 @@ class Web2Feed:
 
                     new_records.append(record)
 
-                html_writer = HtmlWriter(new_records, results_file_name)
-                html_writer.write()
+                if len(new_records) > 0:
+
+                    html_writer = HtmlWriter(new_records, results_file_name)
+                    html_writer.write()
+
+                    self._logger.info("Writing HTML file to %s" % results_file_name)
+                else:
+                    self._logger.info("No records found created in the past %s. Not generating HTML file"
+                                      % write_items_since)
 
             elif writer == "rsswriter":
                 results_file_name = os.path.normpath(out_path + "/" + crawler.plugin_name + ".xml")
 
-                # Get the last 200 records
+                # Get the records inserted i
                 rss_records = []
                 for row in cur.execute(
                         "SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
                         "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
-                        "from records where crawler=? order by creation_date desc, id asc limit 200",
-                        (crawler.plugin_name,)):
+                        "from records where crawler=? and datetime(creation_date,'unixepoch') >= "
+                        "datetime('now',?) order by creation_date desc, id asc",
+                        (crawler.plugin_name, write_items_since)):
 
                     #print(row)
 
@@ -214,8 +216,14 @@ class Web2Feed:
 
                     rss_records.append(record)
 
-                rss_writer = RssWriter(rss_records, crawler.base_url, results_file_name)
-                rss_writer.write()
+                if len(rss_records) > 0:
+                    rss_writer = RssWriter(rss_records, crawler.base_url, results_file_name)
+                    rss_writer.write()
+
+                    self._logger.info("Writing RSS file to %s" % results_file_name)
+                else:
+                    self._logger.info("No records found created in the past %s. Not generating RSS file"
+                                      % write_items_since)
 
             conn.close()
 
@@ -227,6 +235,8 @@ max_fetch_pages = 5
 writer = "htmlwriter"
 #Default path is the current directory
 out_path = os.path.normpath("./")
+#Default Generate Output file with items created in the past x minutes
+write_items_since="-360 minutes"
 
 # List containing the Instantiated Crawlers to crawl with
 crawlers = []
@@ -239,10 +249,10 @@ try:
     if len(sys.argv) <= 1:
         raise getopt.GetoptError("Not enough arguments")
 
-    opts, args = getopt.getopt(sys.argv[1:], "", ["crawlers=", "max-fetch-p=", "writer=", "out-path="])
+    opts, args = getopt.getopt(sys.argv[1:], "", ["crawlers=", "max-fetch-p=", "writer=", "out-path=", "write_items_since="])
 except getopt.GetoptError:
     print("Usage: web2feed.py --crawler=crawler_to_use --max-fetch-p=max_number_pages_to_fetch "
-          "--writer=writer_to_use --out-path=output_path_for_writer")
+          "--writer=writer_to_use --write_items_since=time_in_minutes --out-path=output_path_for_writer")
     sys.exit(2)
 for opt, arg in opts:
     if opt == "--crawlers":
@@ -276,6 +286,9 @@ for opt, arg in opts:
 
         writer = arg
 
+    elif opt == "--write_items_since":
+        write_items_since = "-%s minutes" % arg
+
     elif opt == "--out-path":
         out_path = os.path.normpath(arg)
         out_path = os.path.expanduser(out_path)
@@ -302,6 +315,7 @@ logger = logging.getLogger("web2feed")
 logger.info("Configured crawlers: %s" % crawlers)
 logger.info("Max Pages to Fetch: %s" % max_fetch_pages)
 logger.info("Writer to use: %s" % writer )
+logger.info("Write records created since number of minutes in the past: %s" % write_items_since )
 logger.info("Output Path: %s" % out_path )
 
 news_crawler = Web2Feed(crawlers, int(max_fetch_pages))

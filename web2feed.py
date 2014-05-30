@@ -96,6 +96,10 @@ class Web2Feed:
                 else:
                     self._logger.info("Found %s new records" % len(records))
 
+                    # Hold a list of rejected records to delete them from the list of records up
+                    # for consideration, in case the crawler rejects them
+                    records_rejected = []
+
                     # Proceed to fetch the body of each record
                     for rec in records:
 
@@ -115,6 +119,17 @@ class Web2Feed:
                             body_text = crawler.fetch_body_for(rec, record_soup)
                             if not body_text is None and not body_text == "":
                                 rec.description = body_text
+                        else:
+                            self._logger.info("Record %s rejected by crawler" % rec.link)
+                            records_rejected.append(rec)
+
+                    # Check if we have any rejected records, and if so delete them from our records list
+                    if len(records_rejected) > 0:
+                        for record_rejected in records_rejected:
+                            records.remove(record_rejected)
+
+                        # Clear rejected records list
+                        del records_rejected[:]
 
 
                     for rec in records:

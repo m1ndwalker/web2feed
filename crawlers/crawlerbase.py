@@ -7,8 +7,6 @@ from abc import ABCMeta
 
 class CrawlerBase(metaclass=ABCMeta):
 
-    _logger = logging.getLogger("crawlers.crawler")
-
     news_records = []
 
     @abc.abstractmethod

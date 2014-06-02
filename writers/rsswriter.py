@@ -12,8 +12,6 @@ from xml.sax import saxutils
 
 class RssWriter:
 
-    _logger = logging.getLogger("writers.rsswriter")
-
     _records = []
     _filename = ""
     _source_url = ""
@@ -24,6 +22,7 @@ class RssWriter:
         self._records = records
         self._filename = filename
         self._source_url = source_url
+        self._logger = logging.getLogger("writers.rsswriter")
 
     def write(self):
 

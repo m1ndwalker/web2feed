@@ -4,14 +4,13 @@ import logging
 
 class HtmlWriter:
 
-    _logger = logging.getLogger("writers.htmlwriter")
-
     _records = []
     _filename = ""
 
     def __init__(self, records, filename):
         self._records = records
         self._filename = filename
+        self._logger = logging.getLogger("writers.htmlwriter")
 
     def write(self):
 

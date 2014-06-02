@@ -4,6 +4,7 @@ from newsrecord import NewsRecord
 from writers.htmlwriter import HtmlWriter
 from writers.rsswriter import RssWriter
 from resources import resourcemanager
+from connectors import urlconnector
 
 import time
 import sys
@@ -75,7 +76,9 @@ class Web2Feed:
 
                 req = urllib.request.Request(crawler.get_url_for_page(current_fetch_page),
                                              headers={"User-Agent" : REQUEST_USER_AGENT_STRING})
-                f = urllib.request.urlopen(req)
+                connector = urlconnector.URLConnector(req)
+                f = connector.connect()
+                #f = urllib.request.urlopen(req)
                 #f = open("gitaarmarkt.htm", mode="r", encoding="utf-8")
 
                 soup = BeautifulSoup(f,"html5lib")
@@ -111,7 +114,8 @@ class Web2Feed:
 
                         record_req = urllib.request.Request(rec.link,
                                                             headers={"User-Agent" : REQUEST_USER_AGENT_STRING})
-                        record_f = urllib.request.urlopen(record_req)
+                        record_connector = urlconnector.URLConnector(record_req)
+                        record_f = record_connector.connect()
 
                         record_soup = BeautifulSoup(record_f,"html5lib")
 

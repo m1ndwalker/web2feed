@@ -11,11 +11,14 @@ from crawlers import crawlerbase
 
 class Crawler(crawlerbase.CrawlerBase):
 
-    _logger = logging.getLogger("crawlers.gitaarmarkt")
-
     base_url = "http://www.gitaarmarkt.nl/"
     search_page_url = "http://www.gitaarmarkt.nl/index.php"
     plugin_name = "gitaarmarkt"
+
+
+    def __init__(self):
+        _logger = logging.getLogger("crawlers.gitaarmarkt")
+
 
     def get_url_for_page(self, p_page):
 

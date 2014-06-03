@@ -40,7 +40,7 @@ class Web2Feed:
         cur.execute("select name from sqlite_master where type='table' and name='records'")
         if len(cur.fetchall()) < 1:
             cur.execute("CREATE TABLE records "
-                        "(id text, link text, title text, description text, date real,"
+                        "(id text primary key, link text, title text, description text, date real,"
                         " creation_date real, crawler text)")
             cur.execute("CREATE TABLE crawler_state(last_id text, crawler text unique)")
 
@@ -72,6 +72,14 @@ class Web2Feed:
             # Initialize the Random Seed, to be used throughout
             random.random()
 
+            # We need to keep a history of the page that has been previously crawled. Since we
+            # crawl from page 1..x, it can happen that as we go to page 2, new reocrds have been
+            # added on page 1, pushing to page 2 records that we have already processed. We should
+            # skip those
+            # TODO: consider a better strategy than keeping only the previous page. Maybe a set with all keys instead
+
+            records_prev_page = []
+
             while last_id_found is not True and current_fetch_page <= self._max_fetch_pages:
 
                 req = urllib.request.Request(crawler.get_url_for_page(current_fetch_page),
@@ -93,6 +101,13 @@ class Web2Feed:
                 # We want to be memory efficient
 
                 records = crawler.news_records
+
+                # Remove records that may have been repeated from the previous page
+                for prev_record in records_prev_page:
+                    for record in records:
+                        if prev_record.id == record.id:
+                            self._logger.info("Record with ID %s has already been visited. Skip..." % record.id)
+                            records.remove(record)
 
                 if len(records) == 0:
                     self._logger.info("No new search results found... ")
@@ -138,7 +153,7 @@ class Web2Feed:
 
                     for rec in records:
                         self._logger.info("Inserting new record with ID: %s" % rec.id)
-                        cur.execute("INSERT INTO records VALUES (?,?,?,?,?,?,?)",
+                        cur.execute("INSERT OR IGNORE INTO records VALUES (?,?,?,?,?,?,?)",
                                     (rec.id,
                                      rec.link,
                                      rec.title,
@@ -154,6 +169,9 @@ class Web2Feed:
 
                         cur.execute("INSERT OR REPLACE into crawler_state(last_id, crawler) values (?,?)",
                                     (records[len(records) - 1].id,crawler.plugin_name))
+
+                    # Make a copy for the previous page
+                    records_prev_page = list(records)
 
                     # Clear the crawler list
                     del crawler.news_records[:]
@@ -172,6 +190,9 @@ class Web2Feed:
                     time.sleep(sleep_time)
 
                 current_fetch_page += 1
+
+            # Delete previous page records list
+            del records_prev_page[:]
 
             # Commit results immediately after having fetched them all (there can be an error thrown
             # in the output generation part and then nothing is saved to the database)

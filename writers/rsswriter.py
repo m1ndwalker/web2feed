@@ -30,11 +30,10 @@ class RssWriter:
         if len(self._records) > 0:
             for record in self._records:
                 rss_item = PyRSS2Gen.RSSItem(
-                    author= "1llum1nat1",
                     title= self.unicode_to_valid_xml(record.title),
                     link= self.unicode_to_valid_xml(record.link),
                     description= self.unicode_to_valid_xml(record.description),
-                    guid= self.unicode_to_valid_xml(record.id),
+                    guid= PyRSS2Gen.Guid(self.unicode_to_valid_xml(record.id), isPermaLink= False),
                     pubDate= self.unicode_to_valid_xml(utils.formatdate(time.mktime(record.date.timetuple()), True))
                 )
 

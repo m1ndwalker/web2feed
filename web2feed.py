@@ -46,45 +46,56 @@ class Web2Feed:
 
         return conn, cur
 
-    def crawl(self):
+    def crawl_all(self):
 
         for crawler in crawlers:
+            try:
+                self.crawl(crawler)
+            except Exception as exc:
+                self._logger.error("Error occurred processing Crawler %s. Moving on to the next one.", crawler.plugin_name, exc_info=exc)
 
-            self._logger.info("---------- Preparing to Crawl with %s" % crawler.plugin_name)
+    def crawl(self, crawler):
 
-            conn, cur = self.prep_database()
+        self._logger.info("---------- Preparing to Crawl with %s" % crawler.plugin_name)
 
-            execution_time_str = (time.strftime("%Y%m%d-%H%M%S"))
+        conn, cur = self.prep_database()
 
-            current_fetch_page = 1
-            last_id_found = False
-            last_id = None
+        execution_time_str = (time.strftime("%Y%m%d-%H%M%S"))
 
-            cur.execute("select last_id from crawler_state where crawler=?", (crawler.plugin_name,))
-            last_id_row = cur.fetchone()
-            if last_id_row is None:
-                self._logger.info("Last Stored News ID for Crawler %s doesn't exist" % crawler.plugin_name)
-            else:
-                last_id = last_id_row[0]
-                self._logger.info("Last Stored News ID for Crawler %s is %s" % (crawler.plugin_name, last_id))
+        current_fetch_page = 40
+        last_id_found = False
+        last_id = None
+
+        cur.execute("select last_id from crawler_state where crawler=?", (crawler.plugin_name,))
+        last_id_row = cur.fetchone()
+        if last_id_row is None:
+            self._logger.info("Last Stored News ID for Crawler %s doesn't exist" % crawler.plugin_name)
+        else:
+            last_id = last_id_row[0]
+            self._logger.info("Last Stored News ID for Crawler %s is %s" % (crawler.plugin_name, last_id))
 
 
-            # Initialize the Random Seed, to be used throughout
-            random.random()
+        # Initialize the Random Seed, to be used throughout
+        random.random()
 
-            # We need to keep a history of the page that has been previously crawled. Since we
-            # crawl from page 1..x, it can happen that as we go to page 2, new reocrds have been
-            # added on page 1, pushing to page 2 records that we have already processed. We should
-            # skip those
-            # TODO: consider a better strategy than keeping only the previous page. Maybe a set with all keys instead
+        # We need to keep a history of the page that has been previously crawled. Since we
+        # crawl from page 1..x, it can happen that as we go to page 2, new reocrds have been
+        # added on page 1, pushing to page 2 records that we have already processed. We should
+        # skip those
+        # TODO: consider a better strategy than keeping only the previous page. Maybe a set with all keys instead
 
-            records_prev_page = []
+        records_prev_page = []
 
-            while last_id_found is not True and current_fetch_page <= self._max_fetch_pages:
+        while last_id_found is not True and current_fetch_page <= self._max_fetch_pages:
 
-                req = urllib.request.Request(crawler.get_url_for_page(current_fetch_page),
-                                             headers={"User-Agent" : REQUEST_USER_AGENT_STRING})
-                connector = urlconnector.URLConnector(req)
+            req = urllib.request.Request(crawler.get_url_for_page(current_fetch_page),
+                                         headers={"User-Agent" : REQUEST_USER_AGENT_STRING})
+            connector = urlconnector.URLConnector(req)
+
+            # Execute crawler.process_page on the crawler plugin inside a try statement since
+            # we want to make sure we close our used resources in case an exception is thrown
+            # from the plugin.
+            try:
                 f = connector.connect()
                 #f = urllib.request.urlopen(req)
                 #f = open("gitaarmarkt.htm", mode="r", encoding="utf-8")
@@ -94,180 +105,182 @@ class Web2Feed:
                 self._logger.info("Requesting crawler to process page %i" % current_fetch_page)
 
                 last_id_found = crawler.process_page(soup, last_id)
+            finally:
+                if f is not None:
+                    f.close()
 
-                f.close()
+            # Retrieve the current records and save them to our database, then clean the array
+            # We want to be memory efficient
 
-                # Retrieve the current records and save them to our database, then clean the array
-                # We want to be memory efficient
+            records = crawler.news_records
 
-                records = crawler.news_records
+            # Remove records that may have been repeated from the previous page
+            for prev_record in records_prev_page:
+                for record in records:
+                    if prev_record.id == record.id:
+                        self._logger.info("Record with ID %s has already been visited. Skip..." % record.id)
+                        records.remove(record)
 
-                # Remove records that may have been repeated from the previous page
-                for prev_record in records_prev_page:
-                    for record in records:
-                        if prev_record.id == record.id:
-                            self._logger.info("Record with ID %s has already been visited. Skip..." % record.id)
-                            records.remove(record)
+            if len(records) == 0:
+                self._logger.info("No new search results found... ")
+            else:
+                self._logger.info("Found %s new records" % len(records))
 
-                if len(records) == 0:
-                    self._logger.info("No new search results found... ")
-                else:
-                    self._logger.info("Found %s new records" % len(records))
+                # Hold a list of rejected records to delete them from the list of records up
+                # for consideration, in case the crawler rejects them
+                records_rejected = []
 
-                    # Hold a list of rejected records to delete them from the list of records up
-                    # for consideration, in case the crawler rejects them
-                    records_rejected = []
+                # Proceed to fetch the body of each record
+                for rec in records:
 
-                    # Proceed to fetch the body of each record
-                    for rec in records:
+                    # To avoid hitting the server always at the same interval, generate a random sleep time in secs
+                    sleep_time = random.randint(1,10)
+                    self._logger.info("In %i seconds, Fetching body for %s" % (sleep_time, rec.link))
 
-                        # To avoid hitting the server always at the same interval, generate a random sleep time in secs
-                        sleep_time = random.randint(1,10)
-                        self._logger.info("In %i seconds, Fetching body for %s" % (sleep_time, rec.link))
-
-                        time.sleep(sleep_time)
-
-                        record_req = urllib.request.Request(rec.link,
-                                                            headers={"User-Agent" : REQUEST_USER_AGENT_STRING})
-                        record_connector = urlconnector.URLConnector(record_req)
-                        record_f = record_connector.connect()
-
-                        record_soup = BeautifulSoup(record_f,"html5lib")
-
-                        if not crawler.reject_record(rec, record_soup):
-                            body_text = crawler.fetch_body_for(rec, record_soup)
-                            if not body_text is None and not body_text == "":
-                                rec.description = body_text
-                        else:
-                            self._logger.info("Record %s rejected by crawler" % rec.link)
-                            records_rejected.append(rec)
-
-                    # Check if we have any rejected records, and if so delete them from our records list
-                    if len(records_rejected) > 0:
-                        for record_rejected in records_rejected:
-                            records.remove(record_rejected)
-
-                        # Clear rejected records list
-                        del records_rejected[:]
-
-
-                    for rec in records:
-                        self._logger.info("Inserting new record with ID: %s" % rec.id)
-                        cur.execute("INSERT OR IGNORE INTO records VALUES (?,?,?,?,?,?,?)",
-                                    (rec.id,
-                                     rec.link,
-                                     rec.title,
-                                     rec.description,
-                                     time.mktime(rec.date.timetuple()),
-                                     time.time(),
-                                     crawler.plugin_name))
-
-                    # We iterate the pages from most recent to oldest, therefore our last found ID will be the
-                    # First item found, on the 1st page.
-                    if current_fetch_page == 1:
-                        self._logger.info("Saving Last Found ID: %s" % records[len(records) - 1].id)
-
-                        cur.execute("INSERT OR REPLACE into crawler_state(last_id, crawler) values (?,?)",
-                                    (records[len(records) - 1].id,crawler.plugin_name))
-
-                    # Make a copy for the previous page
-                    records_prev_page = list(records)
-
-                    # Clear the crawler list
-                    del crawler.news_records[:]
-
-                if last_id_found:
-                    self._logger.info("Last Stored News ID Found: " + last_id)
-                    break
-
-                self._logger.info("Processed page %s" % current_fetch_page)
-
-                sleep_time = random.randint(10,20)
-                # Wait 10-20 seconds before requesting the next page. We don't want to overload the server and get banned
-                # Don't always use the same period to appear more human
-                if current_fetch_page < self._max_fetch_pages:
-                    self._logger.info("Waiting %i seconds for next page..." % sleep_time)
                     time.sleep(sleep_time)
 
-                current_fetch_page += 1
+                    record_req = urllib.request.Request(rec.link,
+                                                        headers={"User-Agent" : REQUEST_USER_AGENT_STRING})
+                    record_connector = urlconnector.URLConnector(record_req)
+                    record_f = record_connector.connect()
 
-            # Delete previous page records list
-            del records_prev_page[:]
+                    record_soup = BeautifulSoup(record_f,"html5lib")
 
-            # Commit results immediately after having fetched them all (there can be an error thrown
-            # in the output generation part and then nothing is saved to the database)
-            conn.commit()
+                    if not crawler.reject_record(rec, record_soup):
+                        body_text = crawler.fetch_body_for(rec, record_soup)
+                        if not body_text is None and not body_text == "":
+                            rec.description = body_text
+                    else:
+                        self._logger.info("Record %s rejected by crawler" % rec.link)
+                        records_rejected.append(rec)
 
-            if writer == "htmlwriter":
-                results_file_name = os.path.normpath(out_path + "/" + crawler.plugin_name + "_results_" + execution_time_str +  ".htm")
+                # Check if we have any rejected records, and if so delete them from our records list
+                if len(records_rejected) > 0:
+                    for record_rejected in records_rejected:
+                        records.remove(record_rejected)
 
-                new_records = []
-                for row in cur.execute(
-                        "SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
-                        "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
-                        "from records where crawler=? and datetime(creation_date,'unixepoch') >= "
-                        "datetime('now',?) order by creation_date desc, id asc",
-                        (crawler.plugin_name, write_items_since)):
-
-                    record = NewsRecord()
-                    record.id = row[0]
-                    record.link = row[1]
-                    record.title = row[2]
-                    record.description= row[3]
-                    record.date = datetime.datetime.strptime(row[4], "%Y-%m-%d %H:%M:%S")
-                    record.creation_date = datetime.datetime.strptime(row[5], "%Y-%m-%d %H:%M:%S")
-                    record.crawler_name = row[6]
-
-                    new_records.append(record)
-
-                if len(new_records) > 0:
-
-                    html_writer = HtmlWriter(new_records, results_file_name)
-                    html_writer.write()
-
-                    self._logger.info("Writing HTML file to %s" % results_file_name)
-                else:
-                    self._logger.info("No records found created in the past %s. Not generating HTML file"
-                                      % write_items_since)
-
-            elif writer == "rsswriter":
-                results_file_name = os.path.normpath(out_path + "/" + crawler.plugin_name + ".xml")
-
-                # Get the records inserted i
-                rss_records = []
-                for row in cur.execute(
-                        "SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
-                        "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
-                        "from records where crawler=? and datetime(creation_date,'unixepoch') >= "
-                        "datetime('now',?) order by creation_date desc, id asc",
-                        (crawler.plugin_name, write_items_since)):
-
-                    #print(row)
+                    # Clear rejected records list
+                    del records_rejected[:]
 
 
-                    record = NewsRecord()
-                    record.id = row[0]
-                    record.link = row[1]
-                    record.title = row[2]
-                    record.description= row[3]
-                    record.date = datetime.datetime.strptime(row[4], "%Y-%m-%d %H:%M:%S")
-                    record.creation_date = datetime.datetime.strptime(row[5], "%Y-%m-%d %H:%M:%S")
-                    record.crawler_name = row[6]
+                for rec in records:
+                    self._logger.info("Inserting new record with ID: %s" % rec.id)
+                    cur.execute("INSERT OR IGNORE INTO records VALUES (?,?,?,?,?,?,?)",
+                                (rec.id,
+                                 rec.link,
+                                 rec.title,
+                                 rec.description,
+                                 time.mktime(rec.date.timetuple()),
+                                 time.time(),
+                                 crawler.plugin_name))
 
-                    rss_records.append(record)
+                # We iterate the pages from most recent to oldest, therefore our last found ID will be the
+                # First item found, on the 1st page.
+                if current_fetch_page == 1:
+                    self._logger.info("Saving Last Found ID: %s" % records[len(records) - 1].id)
 
-                if len(rss_records) > 0:
-                    rss_writer = RssWriter(rss_records, crawler.base_url, results_file_name)
-                    rss_writer.write()
+                    cur.execute("INSERT OR REPLACE into crawler_state(last_id, crawler) values (?,?)",
+                                (records[len(records) - 1].id,crawler.plugin_name))
 
-                    self._logger.info("Writing RSS file to %s" % results_file_name)
-                else:
-                    self._logger.info("No records found created in the past %s. Not generating RSS file"
-                                      % write_items_since)
+                # Make a copy for the previous page
+                records_prev_page = list(records)
 
-            conn.close()
+                # Clear the crawler list
+                del crawler.news_records[:]
 
-            self._logger.info("---------- Finished Crawling with %s" % crawler.plugin_name)
+            if last_id_found:
+                self._logger.info("Last Stored News ID Found: " + last_id)
+                break
+
+            self._logger.info("Processed page %s" % current_fetch_page)
+
+            sleep_time = random.randint(10,20)
+            # Wait 10-20 seconds before requesting the next page. We don't want to overload the server and get banned
+            # Don't always use the same period to appear more human
+            if current_fetch_page < self._max_fetch_pages:
+                self._logger.info("Waiting %i seconds for next page..." % sleep_time)
+                time.sleep(sleep_time)
+
+            current_fetch_page += 1
+
+        # Delete previous page records list
+        del records_prev_page[:]
+
+        # Commit results immediately after having fetched them all (there can be an error thrown
+        # in the output generation part and then nothing is saved to the database)
+        conn.commit()
+
+        if writer == "htmlwriter":
+            results_file_name = os.path.normpath(out_path + "/" + crawler.plugin_name + "_results_" + execution_time_str +  ".htm")
+
+            new_records = []
+            for row in cur.execute(
+                    "SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
+                    "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
+                    "from records where crawler=? and datetime(creation_date,'unixepoch') >= "
+                    "datetime('now',?) order by creation_date desc, id asc",
+                    (crawler.plugin_name, write_items_since)):
+
+                record = NewsRecord()
+                record.id = row[0]
+                record.link = row[1]
+                record.title = row[2]
+                record.description= row[3]
+                record.date = datetime.datetime.strptime(row[4], "%Y-%m-%d %H:%M:%S")
+                record.creation_date = datetime.datetime.strptime(row[5], "%Y-%m-%d %H:%M:%S")
+                record.crawler_name = row[6]
+
+                new_records.append(record)
+
+            if len(new_records) > 0:
+
+                html_writer = HtmlWriter(new_records, results_file_name)
+                html_writer.write()
+
+                self._logger.info("Writing HTML file to %s" % results_file_name)
+            else:
+                self._logger.info("No records found created in the past %s. Not generating HTML file"
+                                  % write_items_since)
+
+        elif writer == "rsswriter":
+            results_file_name = os.path.normpath(out_path + "/" + crawler.plugin_name + ".xml")
+
+            # Get the records inserted i
+            rss_records = []
+            for row in cur.execute(
+                    "SELECT id, link, title, description, datetime(date, 'unixepoch', 'localtime'), "
+                    "datetime(creation_date, 'unixepoch', 'localtime'), crawler "
+                    "from records where crawler=? and datetime(creation_date,'unixepoch') >= "
+                    "datetime('now',?) order by creation_date desc, id asc",
+                    (crawler.plugin_name, write_items_since)):
+
+                #print(row)
+
+
+                record = NewsRecord()
+                record.id = row[0]
+                record.link = row[1]
+                record.title = row[2]
+                record.description= row[3]
+                record.date = datetime.datetime.strptime(row[4], "%Y-%m-%d %H:%M:%S")
+                record.creation_date = datetime.datetime.strptime(row[5], "%Y-%m-%d %H:%M:%S")
+                record.crawler_name = row[6]
+
+                rss_records.append(record)
+
+            if len(rss_records) > 0:
+                rss_writer = RssWriter(rss_records, crawler.base_url, results_file_name)
+                rss_writer.write()
+
+                self._logger.info("Writing RSS file to %s" % results_file_name)
+            else:
+                self._logger.info("No records found created in the past %s. Not generating RSS file"
+                                  % write_items_since)
+
+        conn.close()
+
+        self._logger.info("---------- Finished Crawling with %s" % crawler.plugin_name)
+
 
 #Max Fetch pages Default value is 5
 max_fetch_pages = 5
@@ -360,4 +373,4 @@ logger.info("Output Path: %s" % out_path )
 
 news_crawler = Web2Feed(crawlers, int(max_fetch_pages))
 news_crawler._logger =  logger
-news_crawler.crawl()
+news_crawler.crawl_all()

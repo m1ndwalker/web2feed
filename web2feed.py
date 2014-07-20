@@ -62,7 +62,8 @@ class Web2Feed:
 
         execution_time_str = (time.strftime("%Y%m%d-%H%M%S"))
 
-        current_fetch_page = 40
+        # TODO: Externalize the starting fetch page for testing purposes in the future
+        current_fetch_page = 1
         last_id_found = False
         last_id = None
 
